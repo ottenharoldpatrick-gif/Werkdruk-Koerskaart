@@ -1,13 +1,9 @@
 <?php
-
-
-if ( ! defined( 'ABSPATH' ) ) {
-    exit;
-}
+if ( ! defined( 'ABSPATH' ) ) exit;
 
 class Werkdruk_Form {
 
-    private static $oorzaken = array(
+    private static array $oorzaken = [
         'Hoge lesbelasting / veel lesuren',
         'Veel administratieve taken',
         'Veel zorgleerlingen in de klas',
@@ -22,9 +18,9 @@ class Werkdruk_Form {
         'Te weinig autonomie in eigen werk',
         'Gedragsproblemen van leerlingen',
         'Pauze-surveillance zonder hersteltijd erna',
-    );
+    ];
 
-    private static $maatregelen = array(
+    private static array $maatregelen = [
         'Externen inzetten voor surveillance tijdens toetsweken',
         'Leerlingenbalie oprichten voor psychosociale ondersteuning',
         'Structuurklas inrichten voor leerlingen met extra behoeften',
@@ -42,440 +38,432 @@ class Werkdruk_Form {
         'Extra verzuimcoördinator of conciërge aanstellen',
         'Collegiale lesbezoeken plannen als ontwikkeltijd',
         'Faciliteiten verbeteren (kantine, kopieerapparaten, meubilair)',
-    );
+    ];
 
-    public static function render( $team_preset, $status, $errors ) {
-        self::render_styles();
-        self::render_notices( $status, $errors );
-        self::render_formulier( $team_preset );
+    /* ------------------------------------------------------------------ */
+    /*  Publieke ingang                                                     */
+    /* ------------------------------------------------------------------ */
+
+    public static function render( string $team_preset, string $status, array $errors ): void {
+        self::styles();
+        self::notices( $status, $errors );
+        self::form( $team_preset );
     }
 
-    private static function render_styles() {
-        static $printed = false;
-        if ( $printed ) return;
-        $printed = true;
-        echo '<style>
-        .wk-wrap{max-width:780px;margin:0 auto;font-family:inherit;color:#1a1a1a;}
-        .wk-notice{padding:14px 18px;border-radius:4px;margin-bottom:24px;font-size:.97em;line-height:1.5;}
-        .wk-notice--ok{background:#eaf7ea;border-left:4px solid #2e8b2e;color:#1a4d1a;}
-        .wk-notice--error{background:#fdf2f2;border-left:4px solid #c0392b;color:#6b1a1a;}
-        .wk-notice--error ul{margin:8px 0 0 18px;padding:0;}
-        .wk-form{width:100%;}
-        .wk-stap{background:#fff;border:1px solid #dde3ea;border-radius:6px;padding:28px 32px;margin-bottom:28px;}
-        .wk-stap__kop{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
-        .wk-stap__nr{background:#004080;color:#fff;font-size:.78em;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap;}
-        .wk-stap__titel{margin:0;font-size:1.18em;font-weight:700;color:#004080;flex:1;}
-        .wk-stap__intro{margin:0 0 20px 0;color:#444;line-height:1.6;}
-        .wk-label{display:block;font-weight:600;margin:16px 0 5px 0;color:#1a1a1a;}
-        .wk-hint{font-weight:400;color:#666;font-size:.9em;}
-        .wk-req{color:#c0392b;}
-        .wk-input{display:block;width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #b0bec5;border-radius:4px;font-size:1em;font-family:inherit;color:#1a1a1a;background:#fafafa;transition:border-color .15s;}
-        .wk-input:focus{outline:none;border-color:#004080;background:#fff;}
-        textarea.wk-input{resize:vertical;min-height:72px;}
-        .wk-fieldset{border:none;padding:0;margin:8px 0 0 0;}
-        .wk-radio{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;cursor:pointer;line-height:1.5;}
-        .wk-radio input[type="radio"]{margin-top:3px;flex-shrink:0;}
-        .wk-info-btn{background:none;border:2px solid #004080;color:#004080;border-radius:50%;width:28px;height:28px;font-size:1em;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;line-height:1;}
-        .wk-info-btn:hover{background:#004080;color:#fff;}
-        .wk-popup{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;}
-        .wk-popup[hidden]{display:none;}
-        .wk-popup__kader{background:#fff;border-radius:8px;padding:32px 36px;max-width:560px;width:100%;position:relative;box-shadow:0 8px 32px rgba(0,0,0,.18);max-height:85vh;overflow-y:auto;}
-        .wk-popup__kader h3{margin:0 0 14px 0;color:#004080;font-size:1.1em;}
-        .wk-popup__kader p{margin:0 0 12px 0;line-height:1.65;color:#333;}
-        .wk-popup__sluit{position:absolute;top:14px;right:16px;background:none;border:none;font-size:1.5em;cursor:pointer;color:#666;line-height:1;padding:0;}
-        .wk-popup__sluit:hover{color:#c0392b;}
-        .wk-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
-        .wk-chip{background:#eef3fa;border:1px solid #b0c4de;color:#004080;border-radius:20px;padding:5px 14px;font-size:.88em;cursor:pointer;transition:background .15s;font-family:inherit;}
-        .wk-chip:hover{background:#004080;color:#fff;border-color:#004080;}
-        .wk-dynamic-lijst{display:flex;flex-direction:column;gap:10px;margin-bottom:10px;}
-        .wk-dynamic-item{display:flex;gap:8px;align-items:flex-start;}
-        .wk-dynamic-item .wk-input{flex:1;}
-        .wk-verwijder-btn{background:none;border:1px solid #b0bec5;border-radius:4px;color:#666;cursor:pointer;padding:6px 10px;font-size:.9em;margin-top:2px;flex-shrink:0;font-family:inherit;}
-        .wk-verwijder-btn:hover{background:#fdf2f2;border-color:#c0392b;color:#c0392b;}
-        .wk-maatregel-blok{border:1px solid #dde3ea;border-radius:5px;padding:16px;margin-bottom:12px;background:#fafbfc;}
-        .wk-maatregel-kop{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-        .wk-maatregel-kop span{font-weight:700;color:#004080;font-size:.95em;}
-        .wk-select{display:block;width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #b0bec5;border-radius:4px;font-size:1em;font-family:inherit;background:#fafafa;color:#1a1a1a;}
-        .wk-select:focus{outline:none;border-color:#004080;}
-        .wk-btn{display:inline-block;padding:10px 20px;border-radius:4px;font-size:.95em;font-family:inherit;cursor:pointer;border:none;font-weight:600;}
-        .wk-btn--add{background:#eef3fa;color:#004080;border:1px dashed #004080;margin-bottom:6px;}
-        .wk-btn--add:hover{background:#d6e4f7;}
-        .wk-btn--primary{background:#004080;color:#fff;font-size:1.05em;padding:13px 28px;}
-        .wk-btn--primary:hover{background:#00306a;}
-        .wk-submit-rij{margin-top:10px;margin-bottom:40px;}
-        @media(max-width:600px){.wk-stap{padding:18px 14px;}.wk-popup__kader{padding:22px 16px;}}
-        </style>';
+    /* ------------------------------------------------------------------ */
+    /*  CSS (éénmalig)                                                      */
+    /* ------------------------------------------------------------------ */
+
+    private static function styles(): void {
+        static $done = false;
+        if ( $done ) return;
+        $done = true;
+        // phpcs:disable
+        echo <<<'CSS'
+<style>
+.wk{max-width:780px;margin:0 auto;font-family:inherit;color:#1a1a1a}
+.wk-notice{padding:14px 18px;border-radius:4px;margin-bottom:24px;font-size:.97em;line-height:1.5}
+.wk-ok{background:#eaf7ea;border-left:4px solid #2e8b2e;color:#1a4d1a}
+.wk-err{background:#fdf2f2;border-left:4px solid #c0392b;color:#6b1a1a}
+.wk-err ul{margin:8px 0 0 18px;padding:0}
+.wk-stap{background:#fff;border:1px solid #dde3ea;border-radius:6px;padding:28px 32px;margin-bottom:28px}
+.wk-kop{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.wk-nr{background:#004080;color:#fff;font-size:.78em;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.wk-titel{margin:0;font-size:1.18em;font-weight:700;color:#004080;flex:1}
+.wk-intro{margin:0 0 20px;color:#444;line-height:1.6}
+.wk-lbl{display:block;font-weight:600;margin:16px 0 5px;color:#1a1a1a}
+.wk-hint{font-weight:400;color:#666;font-size:.9em}
+.wk-req{color:#c0392b}
+.wk-inp{display:block;width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #b0bec5;border-radius:4px;font-size:1em;font-family:inherit;color:#1a1a1a;background:#fafafa;transition:border-color .15s}
+.wk-inp:focus{outline:none;border-color:#004080;background:#fff}
+textarea.wk-inp{resize:vertical;min-height:72px}
+.wk-sel{display:block;width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #b0bec5;border-radius:4px;font-size:1em;font-family:inherit;background:#fafafa;color:#1a1a1a}
+.wk-sel:focus{outline:none;border-color:#004080}
+.wk-fs{border:none;padding:0;margin:8px 0 0}
+.wk-radio{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;cursor:pointer;line-height:1.5}
+.wk-radio input{margin-top:3px;flex-shrink:0}
+.wk-ibtn{background:none;border:2px solid #004080;color:#004080;border-radius:50%;width:28px;height:28px;font-size:1em;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;line-height:1}
+.wk-ibtn:hover{background:#004080;color:#fff}
+.wk-popup{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.wk-popup[hidden]{display:none}
+.wk-popup-kader{background:#fff;border-radius:8px;padding:32px 36px;max-width:560px;width:100%;position:relative;box-shadow:0 8px 32px rgba(0,0,0,.18);max-height:85vh;overflow-y:auto}
+.wk-popup-kader h3{margin:0 0 14px;color:#004080;font-size:1.1em}
+.wk-popup-kader p{margin:0 0 12px;line-height:1.65;color:#333}
+.wk-sluit{position:absolute;top:14px;right:16px;background:none;border:none;font-size:1.5em;cursor:pointer;color:#666;line-height:1;padding:0}
+.wk-sluit:hover{color:#c0392b}
+.wk-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.wk-chip{background:#eef3fa;border:1px solid #b0c4de;color:#004080;border-radius:20px;padding:5px 14px;font-size:.88em;cursor:pointer;transition:background .15s;font-family:inherit}
+.wk-chip:hover{background:#004080;color:#fff;border-color:#004080}
+.wk-lijst{display:flex;flex-direction:column;gap:10px;margin-bottom:10px}
+.wk-item{display:flex;gap:8px;align-items:flex-start}
+.wk-item .wk-inp{flex:1}
+.wk-del{background:none;border:1px solid #b0bec5;border-radius:4px;color:#666;cursor:pointer;padding:6px 10px;font-size:.9em;margin-top:2px;flex-shrink:0;font-family:inherit}
+.wk-del:hover{background:#fdf2f2;border-color:#c0392b;color:#c0392b}
+.wk-mblok{border:1px solid #dde3ea;border-radius:5px;padding:16px;margin-bottom:12px;background:#fafbfc}
+.wk-mkop{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.wk-mkop span{font-weight:700;color:#004080;font-size:.95em}
+.wk-btn{display:inline-block;padding:10px 20px;border-radius:4px;font-size:.95em;font-family:inherit;cursor:pointer;border:none;font-weight:600}
+.wk-btn-add{background:#eef3fa;color:#004080;border:1px dashed #004080;margin-bottom:6px}
+.wk-btn-add:hover{background:#d6e4f7}
+.wk-btn-submit{background:#004080;color:#fff;font-size:1.05em;padding:13px 28px}
+.wk-btn-submit:hover{background:#00306a}
+.wk-submit{margin-top:10px;margin-bottom:40px}
+@media(max-width:600px){.wk-stap{padding:18px 14px}.wk-popup-kader{padding:22px 16px}}
+</style>
+CSS;
+        // phpcs:enable
     }
 
-    private static function render_notices( $status, $errors ) {
+    /* ------------------------------------------------------------------ */
+    /*  Meldingen                                                           */
+    /* ------------------------------------------------------------------ */
+
+    private static function notices( string $status, array $errors ): void {
         if ( $status === 'ok' ) {
-                        
-                        
+            echo '<div class="wk-notice wk-ok">✓ Je bijdrage is succesvol opgeslagen. Bedankt!</div>';
         }
         if ( $status === 'error' && ! empty( $errors ) ) {
-            echo '<div class="wk-notice wk-notice--error"><strong>Let op:</strong><ul>';
+            echo '<div class="wk-notice wk-err"><strong>Let op:</strong><ul>';
             foreach ( $errors as $e ) {
-                echo '>' . esc_html( $e ) . '</li>';
+                echo '<li>' . esc_html( $e ) . '</li>';
             }
             echo '</ul></div>';
         }
     }
 
-    private static function render_formulier( $team_preset ) {
+    /* ------------------------------------------------------------------ */
+    /*  Formulier                                                           */
+    /* ------------------------------------------------------------------ */
+
+    private static function form( string $team_preset ): void {
         $nonce = wp_nonce_field( 'werkdruk_submit', 'werkdruk_nonce', true, false );
-        $html  = '<form class="wk-form" method="post" novalidate>';
-        $html .= $nonce;
-        $html .= '<input type="hidden" name="werkdruk_submit" value="1">';
-        $html .= self::stap1( $team_preset );
-        $html .= self::stap2();
-        $html .= self::stap3();
-        $html .= self::stap4();
-        $html .= self::stap6();
-        $html .= '<div class="wk-submit-rij">';
-        $html .= '<button type="submit" class="wk-btn wk-btn--primary">Verstuur mijn bijdrage aan het werkdrukplan</button>';
-        $html .= '</div>';
-        $html .= '</form>';
-        echo $html;
-        self::render_scripts();
+        echo '<div class="wk">';
+        echo '<form method="post" novalidate>' . $nonce;
+        echo '<input type="hidden" name="werkdruk_submit" value="1">';
+        echo self::stap( 1, 'Startpunt',          self::stap1_body( $team_preset ), self::popup1() );
+        echo self::stap( 2, 'Ervaren werkdruk',    self::stap2_body(),               self::popup2() );
+        echo self::stap( 3, 'Oorzaken',            self::stap3_body(),               self::popup3() );
+        echo self::stap( 4, 'Oplossingsrichtingen', self::stap4_body(),              self::popup4() );
+        echo self::stap( 5, 'Maatregelen',          self::stap5_body(),              self::popup5() );
+        echo '<div class="wk-submit">';
+        echo '<button type="submit" class="wk-btn wk-btn-submit">Verstuur mijn bijdrage aan het werkdrukplan</button>';
+        echo '</div></form></div>';
+        self::scripts();
     }
 
-    private static function stap1( $team_preset ) {
-        $team = esc_attr( $team_preset );
-        $h  = '<section class="wk-stap">';
-        $h .= '<div class="wk-stap__kop">';
-        $h .= '<span class="wk-stap__nr">Stap 1</span>';
-        $h .= '<h2 class="wk-stap__titel">Startpunt</h2>';
-        $h .= '<button type="button" class="wk-info-btn" data-popup="wk-pop-1" aria-label="Meer informatie stap 1">&#9432;</button>';
-        $h .= '</div>';
-        $h .= '<div class="wk-popup" id="wk-pop-1" hidden>';
-        $h .= '<div class="wk-popup__kader">';
-        $h .= '<button type="button" class="wk-popup__sluit" aria-label="Sluiten">&times;</button>';
-        $h .= '<h3>Stap 1 - Startpunt</h3>';
-        $h .= '<p>In de CAO VO (hoofdstuk 8.7) is afgesproken dat er structureel <strong>300 miljoen euro per jaar</strong> beschikbaar is voor werkdrukverlichting.</p>';
-        $h .= '<p>Werknemers bepalen <strong>gezamenlijk</strong> waaraan de collectieve middelen worden besteed. Dit formulier is stap een in dat proces.</p>';
-        $h .= '<p>Iedereen vult dit formulier individueel in. De uitkomsten zijn direct voor het hele team zichtbaar.</p>';
-        $h .= '</div></div>';
-        $h .= '<p class="wk-stap__intro">Vul jouw naam en de naam van het team in.</p>';
-        $h .= '<label class="wk-label" for="wk_team">Team / sectie <span class="wk-req">*</span></label>';
-        $h .= '<input class="wk-input" type="text" id="wk_team" name="team" value="' . $team . '" placeholder="bijv. Economie bovenbouw" required>';
-        $h .= '<label class="wk-label" for="wk_name">Jouw naam <span class="wk-req">*</span></label>';
-        $h .= '<input class="wk-input" type="text" id="wk_name" name="name" placeholder="bijv. Jan de Vries" required>';
-        $h .= '</section>';
-        return $h;
+    /* ------------------------------------------------------------------ */
+    /*  Stap-wrapper                                                        */
+    /* ------------------------------------------------------------------ */
+
+    private static function stap( int $n, string $titel, string $body, string $popup ): string {
+        $id = 'wk-pop-' . $n;
+        return '<section class="wk-stap">'
+            . '<div class="wk-kop">'
+            . '<span class="wk-nr">Stap ' . $n . '</span>'
+            . '<h2 class="wk-titel">' . esc_html( $titel ) . '</h2>'
+            . '<button type="button" class="wk-ibtn" data-popup="' . $id . '" aria-label="Meer informatie stap ' . $n . '">&#9432;</button>'
+            . '</div>'
+            . '<div class="wk-popup" id="' . $id . '" hidden>'
+            . '<div class="wk-popup-kader">'
+            . '<button type="button" class="wk-sluit" aria-label="Sluiten">&times;</button>'
+            . $popup
+            . '</div></div>'
+            . $body
+            . '</section>';
     }
 
-    private static function stap2() {
-        $h  = '<section class="wk-stap">';
-        $h .= '<div class="wk-stap__kop">';
-        $h .= '<span class="wk-stap__nr">Stap 2</span>';
-        $h .= '<h2 class="wk-stap__titel">Ervaren werkdruk</h2>';
-        $h .= '<button type="button" class="wk-info-btn" data-popup="wk-pop-2" aria-label="Meer informatie stap 2">&#9432;</button>';
-        $h .= '</div>';
-        $h .= '<div class="wk-popup" id="wk-pop-2" hidden>';
-        $h .= '<div class="wk-popup__kader">';
-        $h .= '<button type="button" class="wk-popup__sluit" aria-label="Sluiten">&times;</button>';
-        $h .= '<h3>Stap 2 - Ervaren werkdruk</h3>';
-        $h .= '<p><strong>Werkdruk</strong> ontstaat wanneer de taakeisen hoger zijn dan wat jij in de beschikbare tijd kunt verwerken.</p>';
-        $h .= '<p><strong>Laag</strong> - Je voert je werk comfortabel uit binnen de beschikbare tijd.<br>';
-        $h .= '<strong>Gemiddeld</strong> - Je ervaart regelmatig tijdsdruk, maar het is beheersbaar.<br>';
-        $h .= '<strong>Hoog</strong> - Je ervaart structureel te veel taken voor de beschikbare tijd.</p>';
-        $h .= '</div></div>';
-        $h .= '<p class="wk-stap__intro">Geef aan hoeveel werkdruk jij op dit moment ervaart. Denk aan de afgelopen weken als richtlijn.</p>';
-        $h .= '<fieldset class="wk-fieldset">';
-        $h .= '<legend class="wk-label">Werkdrukniveau <span class="wk-req">*</span></legend>';
-        $h .= '<label class="wk-radio"><input type="radio" name="wp_level" value="laag" required> Laag - ik ervaar de werkdruk als goed te beheren</label>';
-        $h .= '<label class="wk-radio"><input type="radio" name="wp_level" value="gemiddeld"> Gemiddeld - ik ervaar regelmatig tijdsdruk</label>';
-        $h .= '<label class="wk-radio"><input type="radio" name="wp_level" value="hoog"> Hoog - ik ervaar structureel te veel taken voor de beschikbare tijd</label>';
-        $h .= '<label class="wk-radio"><input type="radio" name="wp_level" value="nvt"> n.v.t.</label>';
-        $h .= '</fieldset>';
-        $h .= '<label class="wk-label" for="wk_note">Korte toelichting <span class="wk-hint">(optioneel)</span></label>';
-        $h .= '<textarea class="wk-input" id="wk_note" name="wp_note" rows="3" placeholder="Wat maakt dat jij dit niveau ervaart?"></textarea>';
-        $h .= '</section>';
-        return $h;
+    /* ------------------------------------------------------------------ */
+    /*  Popup-teksten                                                       */
+    /* ------------------------------------------------------------------ */
+
+    private static function popup1(): string {
+        return '<h3>Stap 1 – Startpunt</h3>'
+            . '<p>In de CAO VO (hoofdstuk 8.7) is afgesproken dat er structureel <strong>300 miljoen euro per jaar</strong> beschikbaar is voor werkdrukverlichting.</p>'
+            . '<p>Werknemers bepalen <strong>gezamenlijk</strong> waaraan de collectieve middelen worden besteed. Dit formulier is stap één in dat proces.</p>'
+            . '<p>Iedereen vult dit formulier individueel in. De uitkomsten zijn direct voor het hele team zichtbaar.</p>';
     }
 
-    private static function stap3() {
-        $h  = '<section class="wk-stap">';
-        $h .= '<div class="wk-stap__kop">';
-        $h .= '<span class="wk-stap__nr">Stap 3</span>';
-        $h .= '<h2 class="wk-stap__titel">Oorzaken van werkdruk</h2>';
-        $h .= '<button type="button" class="wk-info-btn" data-popup="wk-pop-3" aria-label="Meer informatie stap 3">&#9432;</button>';
-        $h .= '</div>';
-        $h .= '<div class="wk-popup" id="wk-pop-3" hidden>';
-        $h .= '<div class="wk-popup__kader">';
-        $h .= '<button type="button" class="wk-popup__sluit" aria-label="Sluiten">&times;</button>';
-        $h .= '<h3>Stap 3 - Oorzaken</h3>';
-        $h .= '<p>Benoem oorzaken zo <strong>concreet</strong> mogelijk. Klik op een suggestie om die over te nemen.</p>';
-        $h .= '</div></div>';
-        $h .= '<p class="wk-stap__intro">Wat zijn voor jou de belangrijkste oorzaken van werkdruk? Wees zo concreet mogelijk. Klik op een suggestie om die over te nemen, of typ zelf.</p>';
-        $h .= '<div class="wk-chips">';
-        foreach ( self::$oorzaken as $tip ) {
-            $h .= '<button type="button" class="wk-chip" data-target="wk-causes-lijst" data-name="causes[]" data-value="' . esc_attr( $tip ) . '">' . esc_html( $tip ) . '</button>';
+    private static function popup2(): string {
+        return '<h3>Stap 2 – Ervaren werkdruk</h3>'
+            . '<p><strong>Werkdruk</strong> ontstaat wanneer de taakeisen hoger zijn dan wat jij in de beschikbare tijd kunt verwerken.</p>'
+            . '<p><strong>Laag</strong> – Je voert je werk comfortabel uit binnen de beschikbare tijd.<br>'
+            . '<strong>Gemiddeld</strong> – Je ervaart regelmatig tijdsdruk, maar het is beheersbaar.<br>'
+            . '<strong>Hoog</strong> – Je ervaart structureel te veel taken voor de beschikbare tijd.</p>';
+    }
+
+    private static function popup3(): string {
+        return '<h3>Stap 3 – Oorzaken</h3>'
+            . '<p>Benoem oorzaken zo <strong>concreet</strong> mogelijk. Klik op een suggestie om die over te nemen.</p>';
+    }
+
+    private static function popup4(): string {
+        return '<h3>Stap 4 – Oplossingsrichtingen</h3>'
+            . '<p>Denk breed en vrij. Het gaat om de <strong>richting</strong> van mogelijke oplossingen. In stap 5 werk je deze uit tot concrete maatregelen.</p>';
+    }
+
+    private static function popup5(): string {
+        return '<h3>Stap 5 – Maatregelen</h3>'
+            . '<p>Formuleer concrete maatregelen. Gebruik de suggesties als startpunt.</p>'
+            . '<p><strong>Categorie</strong> – Individueel (eigen werkdrukbudget) of Collectief (schoolbudget)?</p>'
+            . '<p><strong>Effect</strong> – ++ zeer groot &nbsp;+ groot &nbsp;- beperkt &nbsp;-- zeer beperkt</p>'
+            . '<p><strong>Haalbaarheid</strong> – ++ zeer goed &nbsp;+ goed &nbsp;- moeilijk &nbsp;-- nauwelijks</p>';
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Stap-inhoud                                                         */
+    /* ------------------------------------------------------------------ */
+
+    private static function stap1_body( string $team_preset ): string {
+        $t = esc_attr( $team_preset );
+        return '<p class="wk-intro">Vul jouw naam en de naam van het team in.</p>'
+            . '<label class="wk-lbl" for="wk_team">Team / sectie <span class="wk-req">*</span></label>'
+            . '<input class="wk-inp" type="text" id="wk_team" name="team" value="' . $t . '" placeholder="bijv. Economie bovenbouw" required>'
+            . '<label class="wk-lbl" for="wk_name">Jouw naam <span class="wk-req">*</span></label>'
+            . '<input class="wk-inp" type="text" id="wk_name" name="name" placeholder="bijv. Jan de Vries" required>';
+    }
+
+    private static function stap2_body(): string {
+        return '<p class="wk-intro">Geef aan hoeveel werkdruk jij op dit moment ervaart. Denk aan de afgelopen weken als richtlijn.</p>'
+            . '<fieldset class="wk-fs"><legend class="wk-lbl">Werkdrukniveau <span class="wk-req">*</span></legend>'
+            . self::radio( 'wp_level', 'laag',     'Laag – ik ervaar de werkdruk als goed te beheren' )
+            . self::radio( 'wp_level', 'gemiddeld', 'Gemiddeld – ik ervaar regelmatig tijdsdruk' )
+            . self::radio( 'wp_level', 'hoog',     'Hoog – ik ervaar structureel te veel taken voor de beschikbare tijd' )
+            . self::radio( 'wp_level', 'nvt',      'n.v.t.' )
+            . '</fieldset>'
+            . '<label class="wk-lbl" for="wk_note">Korte toelichting <span class="wk-hint">(optioneel)</span></label>'
+            . '<textarea class="wk-inp" id="wk_note" name="wp_note" rows="3" placeholder="Wat maakt dat jij dit niveau ervaart?"></textarea>';
+    }
+
+    private static function stap3_body(): string {
+        return '<p class="wk-intro">Wat zijn voor jou de belangrijkste oorzaken van werkdruk? Wees zo concreet mogelijk. Klik op een suggestie of typ zelf.</p>'
+            . self::chips( self::$oorzaken, 'wk-causes', 'causes[]', 'Oorzaak – beschrijf zo concreet mogelijk' )
+            . '<div class="wk-lijst" id="wk-causes">' . self::dyn_item( 'causes[]', 'Oorzaak – beschrijf zo concreet mogelijk' ) . '</div>'
+            . '<button type="button" class="wk-btn wk-btn-add" data-lijst="wk-causes" data-name="causes[]" data-ph="Oorzaak – beschrijf zo concreet mogelijk">+ Oorzaak toevoegen</button>';
+    }
+
+    private static function stap4_body(): string {
+        return '<p class="wk-intro">Bedenk oplossingsrichtingen om de werkdruk te verlagen. Denk breed en vrij; je werkt ze in stap 5 uit tot concrete maatregelen.</p>'
+            . '<div class="wk-lijst" id="wk-solutions">' . self::dyn_item( 'solutions[]', 'Oplossingsrichting – bijv. minder administratieve taken' ) . '</div>'
+            . '<button type="button" class="wk-btn wk-btn-add" data-lijst="wk-solutions" data-name="solutions[]" data-ph="Oplossingsrichting – bijv. minder administratieve taken">+ Oplossingsrichting toevoegen</button>';
+    }
+
+    private static function stap5_body(): string {
+        return '<p class="wk-intro">Formuleer concrete maatregelen die de werkdruk kunnen verlagen. Klik op een suggestie of typ zelf.</p>'
+            . self::chips( self::$maatregelen, '', '', '' , true )
+            . '<div class="wk-lijst" id="wk-measures">' . self::maatregel_blok( 0 ) . '</div>'
+            . '<button type="button" class="wk-btn wk-btn-add" id="wk-add-maatregel">+ Maatregel toevoegen</button>';
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Herbruikbare HTML-bouwstenen                                        */
+    /* ------------------------------------------------------------------ */
+
+    private static function radio( string $name, string $val, string $label ): string {
+        return '<label class="wk-radio">'
+            . '<input type="radio" name="' . esc_attr( $name ) . '" value="' . esc_attr( $val ) . '" required> '
+            . esc_html( $label )
+            . '</label>';
+    }
+
+    private static function chips( array $items, string $target, string $name, string $ph, bool $maatregel = false ): string {
+        $h = '<div class="wk-chips">';
+        foreach ( $items as $item ) {
+            $cls  = $maatregel ? 'wk-chip wk-chip-m' : 'wk-chip';
+            $data = $maatregel
+                ? 'data-value="' . esc_attr( $item ) . '"'
+                : 'data-target="' . esc_attr( $target ) . '" data-name="' . esc_attr( $name ) . '" data-value="' . esc_attr( $item ) . '"';
+            $h .= '<button type="button" class="' . $cls . '" ' . $data . '>' . esc_html( $item ) . '</button>';
         }
-        $h .= '</div>';
-        $h .= '<div class="wk-dynamic-lijst" id="wk-causes-lijst">';
-        $h .= '<div class="wk-dynamic-item">';
-        $h .= '<textarea class="wk-input" name="causes[]" rows="2" placeholder="Oorzaak - beschrijf zo concreet mogelijk"></textarea>';
-        $h .= '<button type="button" class="wk-verwijder-btn" aria-label="Verwijder">&#10005;</button>';
-        $h .= '</div></div>';
-        $h .= '<button type="button" class="wk-btn wk-btn--add" data-lijst="wk-causes-lijst" data-name="causes[]" data-placeholder="Oorzaak - beschrijf zo concreet mogelijk">+ Oorzaak toevoegen</button>';
-        $h .= '</section>';
-        return $h;
+        return $h . '</div>';
     }
 
-    private static function stap4() {
-        $h  = '<section class="wk-stap">';
-        $h .= '<div class="wk-stap__kop">';
-        $h .= '<span class="wk-stap__nr">Stap 4</span>';
-        $h .= '<h2 class="wk-stap__titel">Oplossingsrichtingen</h2>';
-        $h .= '<button type="button" class="wk-info-btn" data-popup="wk-pop-4" aria-label="Meer informatie stap 4">&#9432;</button>';
-        $h .= '</div>';
-        $h .= '<div class="wk-popup" id="wk-pop-4" hidden>';
-        $h .= '<div class="wk-popup__kader">';
-        $h .= '<button type="button" class="wk-popup__sluit" aria-label="Sluiten">&times;</button>';
-        $h .= '<h3>Stap 4 - Oplossingsrichtingen</h3>';
-        $h .= '<p>Denk breed en vrij. Het gaat om de <strong>richting</strong> van mogelijke oplossingen. In stap 6 werk je deze uit tot concrete maatregelen.</p>';
-        $h .= '</div></div>';
-        $h .= '<p class="wk-stap__intro">Bedenk oplossingsrichtingen om de werkdruk te verlagen. Denk breed en vrij; je werkt ze in stap 6 uit tot concrete maatregelen.</p>';
-        $h .= '<div class="wk-dynamic-lijst" id="wk-solutions-lijst">';
-        $h .= '<div class="wk-dynamic-item">';
-        $h .= '<textarea class="wk-input" name="solutions[]" rows="2" placeholder="Oplossingsrichting - bijv. minder administratieve taken"></textarea>';
-        $h .= '<button type="button" class="wk-verwijder-btn" aria-label="Verwijder">&#10005;</button>';
-        $h .= '</div></div>';
-        $h .= '<button type="button" class="wk-btn wk-btn--add" data-lijst="wk-solutions-lijst" data-name="solutions[]" data-placeholder="Oplossingsrichting - bijv. minder administratieve taken">+ Oplossingsrichting toevoegen</button>';
-        $h .= '</section>';
-        return $h;
+    private static function dyn_item( string $name, string $ph ): string {
+        return '<div class="wk-item">'
+            . '<textarea class="wk-inp" name="' . esc_attr( $name ) . '" rows="2" placeholder="' . esc_attr( $ph ) . '"></textarea>'
+            . '<button type="button" class="wk-del" aria-label="Verwijder">&#10005;</button>'
+            . '</div>';
     }
 
-    private static function stap6() {
-        $h  = '<section class="wk-stap">';
-        $h .= '<div class="wk-stap__kop">';
-        $h .= '<span class="wk-stap__nr">Stap 6</span>';
-        $h .= '<h2 class="wk-stap__titel">Maatregelen</h2>';
-        $h .= '<button type="button" class="wk-info-btn" data-popup="wk-pop-6" aria-label="Meer informatie stap 6">&#9432;</button>';
-        $h .= '</div>';
-        $h .= '<div class="wk-popup" id="wk-pop-6" hidden>';
-        $h .= '<div class="wk-popup__kader">';
-        $h .= '<button type="button" class="wk-popup__sluit" aria-label="Sluiten">&times;</button>';
-        $h .= '<h3>Stap 6 - Maatregelen</h3>';
-        $h .= '<p>Formuleer concrete maatregelen. Gebruik de suggesties als startpunt.</p>';
-        $h .= '<p><strong>Categorie</strong> - Individueel (eigen werkdrukbudget) of Collectief (schoolbudget)?</p>';
-        $h .= '<p><strong>Effect</strong> - ++ zeer groot, + groot, - beperkt, -- zeer beperkt</p>';
-        $h .= '<p><strong>Haalbaarheid</strong> - ++ zeer goed, + goed, - moeilijk, -- nauwelijks</p>';
-        $h .= '</div></div>';
-        $h .= '<p class="wk-stap__intro">Formuleer concrete maatregelen die de werkdruk kunnen verlagen. Klik op een suggestie of typ zelf.</p>';
-        $h .= '<div class="wk-chips">';
-        foreach ( self::$maatregelen as $tip ) {
-            $h .= '<button type="button" class="wk-chip wk-chip--maatregel" data-value="' . esc_attr( $tip ) . '">' . esc_html( $tip ) . '</button>';
+    private static function select( string $name, array $opties ): string {
+        $h = '<select class="wk-sel" name="' . esc_attr( $name ) . '"><option value="">-- kies --</option>';
+        foreach ( $opties as $val => $label ) {
+            $h .= '<option value="' . esc_attr( $val ) . '">' . esc_html( $label ) . '</option>';
         }
-        $h .= '</div>';
-        $h .= '<div class="wk-dynamic-lijst" id="wk-measures-lijst">';
-        $h .= '<div class="wk-maatregel-blok">';
-        $h .= '<div class="wk-maatregel-kop"><span>Maatregel 1</span>';
-        $h .= '<button type="button" class="wk-verwijder-btn" aria-label="Verwijder">&#10005;</button></div>';
-        $h .= '<label class="wk-label">Omschrijving <span class="wk-req">*</span></label>';
-        $h .= '<textarea class="wk-input wk-measure-desc" name="measures[0][desc]" rows="2" placeholder="Beschrijf de maatregel concreet"></textarea>';
-        $h .= '<label class="wk-label">Categorie</label>';
-        $h .= '<select class="wk-select" name="measures[0][cat]">';
-        $h .= '<option value="">-- kies --</option>';
-        $h .= '<option value="individueel">Individueel (eigen werkdrukbudget)</option>';
-        $h .= '<option value="collectief">Collectief (schoolbudget)</option>';
-        $h .= '<option value="nvt">n.v.t.</option>';
-        $h .= '</select>';
-        $h .= '<label class="wk-label">Effect</label>';
-        $h .= '<select class="wk-select" name="measures[0][effect]">';
-        $h .= '<option value="">-- kies --</option>';
-        $h .= '<option value="++">++ Zeer groot effect</option>';
-        $h .= '<option value="+">+ Groot effect</option>';
-        $h .= '<option value="-">- Beperkt effect</option>';
-        $h .= '<option value="--">-- Zeer beperkt effect</option>';
-        $h .= '<option value="nvt">n.v.t.</option>';
-        $h .= '</select>';
-        $h .= '<label class="wk-label">Haalbaarheid</label>';
-        $h .= '<select class="wk-select" name="measures[0][feasibility]">';
-        $h .= '<option value="">-- kies --</option>';
-        $h .= '<option value="++">++ Zeer goed haalbaar</option>';
-        $h .= '<option value="+">+ Goed haalbaar</option>';
-        $h .= '<option value="-">- Moeilijk haalbaar</option>';
-        $h .= '<option value="--">-- Nauwelijks haalbaar</option>';
-        $h .= '<option value="nvt">n.v.t.</option>';
-        $h .= '</select>';
-        $h .= '</div></div>';
-        $h .= '<button type="button" class="wk-btn wk-btn--add" id="wk-add-maatregel">+ Maatregel toevoegen</button>';
-        $h .= '</section>';
-        return $h;
+        return $h . '</select>';
     }
 
-    private static function render_scripts() {
-        echo '<script>
-(function(){
+    public static function maatregel_blok( int $i ): string {
+        $effect = [
+            '++'  => '++ Zeer groot effect',
+            '+'   => '+  Groot effect',
+            '-'   => '-  Beperkt effect',
+            '--'  => '-- Zeer beperkt effect',
+            'nvt' => 'n.v.t.',
+        ];
+        $haalbaar = [
+            '++'  => '++ Zeer goed haalbaar',
+            '+'   => '+  Goed haalbaar',
+            '-'   => '-  Moeilijk haalbaar',
+            '--'  => '-- Nauwelijks haalbaar',
+            'nvt' => 'n.v.t.',
+        ];
+        $cat = [
+            'individueel' => 'Individueel (eigen werkdrukbudget)',
+            'collectief'  => 'Collectief (schoolbudget)',
+            'nvt'         => 'n.v.t.',
+        ];
+        return '<div class="wk-mblok">'
+            . '<div class="wk-mkop"><span>Maatregel ' . ( $i + 1 ) . '</span>'
+            . '<button type="button" class="wk-del" aria-label="Verwijder">&#10005;</button></div>'
+            . '<label class="wk-lbl">Omschrijving <span class="wk-req">*</span></label>'
+            . '<textarea class="wk-inp wk-mdesc" name="measures[' . $i . '][desc]" rows="2" placeholder="Beschrijf de maatregel concreet"></textarea>'
+            . '<label class="wk-lbl">Categorie</label>'
+            . self::select( 'measures[' . $i . '][cat]', $cat )
+            . '<label class="wk-lbl">Effect</label>'
+            . self::select( 'measures[' . $i . '][effect]', $effect )
+            . '<label class="wk-lbl">Haalbaarheid</label>'
+            . self::select( 'measures[' . $i . '][feasibility]', $haalbaar )
+            . '</div>';
+    }
 
-    document.querySelectorAll(".wk-info-btn").forEach(function(btn){
-        btn.addEventListener("click",function(){
-            var p=document.getElementById(btn.getAttribute("data-popup"));
-            if(p) p.hidden=false;
+    /* ------------------------------------------------------------------ */
+    /*  JavaScript                                                          */
+    /* ------------------------------------------------------------------ */
+
+    private static function scripts(): void {
+        // phpcs:disable
+        echo <<<'JS'
+<script>
+(function () {
+    'use strict';
+
+    /* --- Popups --- */
+    document.querySelectorAll('.wk-ibtn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const p = document.getElementById(btn.dataset.popup);
+            if (p) p.hidden = false;
         });
     });
+    document.addEventListener('click', e => {
+        if (e.target.classList.contains('wk-sluit') || e.target.classList.contains('wk-popup'))
+            e.target.closest('.wk-popup').hidden = true;
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape')
+            document.querySelectorAll('.wk-popup:not([hidden])').forEach(p => p.hidden = true);
+    });
 
-    document.addEventListener("click",function(e){
-        if(e.target.classList.contains("wk-popup__sluit")){
-            var p=e.target.closest(".wk-popup");
-            if(p) p.hidden=true;
+    /* --- Dynamische rijen (oorzaken / oplossingen) --- */
+    document.querySelectorAll('.wk-btn-add:not(#wk-add-maatregel)').forEach(btn => {
+        btn.addEventListener('click', () => addItem(btn.dataset.lijst, btn.dataset.name, btn.dataset.ph));
+    });
+
+    function addItem(lijstId, name, ph) {
+        const lijst = document.getElementById(lijstId);
+        if (!lijst) return;
+        const div = document.createElement('div');
+        div.className = 'wk-item';
+        div.innerHTML = `<textarea class="wk-inp" name="${name}" rows="2" placeholder="${ph}"></textarea>`
+            + `<button type="button" class="wk-del" aria-label="Verwijder">&#10005;</button>`;
+        lijst.appendChild(div);
+        div.querySelector('textarea').focus();
+    }
+
+    /* --- Verwijder-knoppen (delegatie) --- */
+    document.addEventListener('click', e => {
+        if (!e.target.classList.contains('wk-del')) return;
+        const item = e.target.closest('.wk-item');
+        const blok = e.target.closest('.wk-mblok');
+        if (item) {
+            const lijst = item.parentElement;
+            if (lijst.querySelectorAll('.wk-item').length > 1) item.remove();
+            else item.querySelector('textarea').value = '';
         }
-        if(e.target.classList.contains("wk-popup")){
-            e.target.hidden=true;
+        if (blok) {
+            const lijst = blok.parentElement;
+            if (lijst.querySelectorAll('.wk-mblok').length > 1) { blok.remove(); hernummer(); }
+            else blok.querySelectorAll('textarea, select').forEach(el => el.value = '');
         }
     });
 
-    document.addEventListener("keydown",function(e){
-        if(e.key==="Escape"){
-            document.querySelectorAll(".wk-popup:not([hidden])").forEach(function(p){
-                p.hidden=true;
-            });
-        }
-    });
-
-    document.querySelectorAll(".wk-btn--add").forEach(function(btn){
-        if(btn.id==="wk-add-maatregel") return;
-        btn.addEventListener("click",function(){
-            var lijst=document.getElementById(btn.getAttribute("data-lijst"));
-            if(!lijst) return;
-            var name=btn.getAttribute("data-name");
-            var ph=btn.getAttribute("data-placeholder")||"";
-            var item=document.createElement("div");
-            item.className="wk-dynamic-item";
-            item.innerHTML="<textarea class=\"wk-input\" name=\""+name+"\" rows=\"2\" placeholder=\""+ph+"\"></textarea>"
-                +"<button type=\"button\" class=\"wk-verwijder-btn\" aria-label=\"Verwijder\">&#10005;</button>";
-            lijst.appendChild(item);
-            item.querySelector("textarea").focus();
-        });
-    });
-
-    document.addEventListener("click",function(e){
-        if(!e.target.classList.contains("wk-verwijder-btn")) return;
-        var item=e.target.closest(".wk-dynamic-item");
-        var blok=e.target.closest(".wk-maatregel-blok");
-        if(item){
-            var lijst=item.parentElement;
-            if(lijst&&lijst.querySelectorAll(".wk-dynamic-item").length>1){
-                item.remove();
-            } else {
-                var ta=item.querySelector("textarea");
-                if(ta) ta.value="";
-            }
-        }
-        if(blok){
-            var ml=blok.parentElement;
-            if(ml&&ml.querySelectorAll(".wk-maatregel-blok").length>1){
-                blok.remove();
-                wkHernummer();
-            } else {
-                blok.querySelectorAll("textarea,select").forEach(function(el){ el.value=""; });
-            }
-        }
-    });
-
-    document.querySelectorAll(".wk-chip:not(.wk-chip--maatregel)").forEach(function(chip){
-        chip.addEventListener("click",function(){
-            var lijst=document.getElementById(chip.getAttribute("data-target"));
-            var name=chip.getAttribute("data-name");
-            var value=chip.getAttribute("data-value");
-            if(!lijst) return;
-            var leeg=null;
-            lijst.querySelectorAll("textarea").forEach(function(ta){
-                if(!leeg&&ta.value.trim()==="") leeg=ta;
-            });
-            if(leeg){
-                leeg.value=value;
-            } else {
-                var item=document.createElement("div");
-                item.className="wk-dynamic-item";
-                item.innerHTML="<textarea class=\"wk-input\" name=\""+name+"\" rows=\"2\"></textarea>"
-                    +"<button type=\"button\" class=\"wk-verwijder-btn\" aria-label=\"Verwijder\">&#10005;</button>";
-                lijst.appendChild(item);
-                item.querySelector("textarea").value=value;
+    /* --- Chips (oorzaken) --- */
+    document.querySelectorAll('.wk-chip:not(.wk-chip-m)').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const lijst  = document.getElementById(chip.dataset.target);
+            const value  = chip.dataset.value;
+            if (!lijst) return;
+            const leeg = [...lijst.querySelectorAll('textarea')].find(ta => !ta.value.trim());
+            if (leeg) leeg.value = value;
+            else {
+                const div = document.createElement('div');
+                div.className = 'wk-item';
+                div.innerHTML = `<textarea class="wk-inp" name="${chip.dataset.name}" rows="2"></textarea>`
+                    + `<button type="button" class="wk-del" aria-label="Verwijder">&#10005;</button>`;
+                lijst.appendChild(div);
+                div.querySelector('textarea').value = value;
             }
         });
     });
 
-    document.querySelectorAll(".wk-chip--maatregel").forEach(function(chip){
-        chip.addEventListener("click",function(){
-            var value=chip.getAttribute("data-value");
-            var lijst=document.getElementById("wk-measures-lijst");
-            if(!lijst) return;
-            var leeg=null;
-            lijst.querySelectorAll(".wk-measure-desc").forEach(function(ta){
-                if(!leeg&&ta.value.trim()==="") leeg=ta;
-            });
-            if(leeg){
-                leeg.value=value;
-            } else {
-                wkNieuweMaatregel(value);
-            }
+    /* --- Chips (maatregelen) --- */
+    document.querySelectorAll('.wk-chip-m').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const lijst = document.getElementById('wk-measures');
+            if (!lijst) return;
+            const leeg = [...lijst.querySelectorAll('.wk-mdesc')].find(ta => !ta.value.trim());
+            if (leeg) leeg.value = chip.dataset.value;
+            else addMaatregel(chip.dataset.value);
         });
     });
 
-    var addBtn=document.getElementById("wk-add-maatregel");
-    if(addBtn) addBtn.addEventListener("click",function(){ wkNieuweMaatregel(""); });
+    /* --- Maatregel toevoegen --- */
+    document.getElementById('wk-add-maatregel')
+        ?.addEventListener('click', () => addMaatregel(''));
 
-    function wkNieuweMaatregel(desc){
-        var lijst=document.getElementById("wk-measures-lijst");
-        if(!lijst) return;
-        var i=lijst.querySelectorAll(".wk-maatregel-blok").length;
-        var blok=document.createElement("div");
-        blok.className="wk-maatregel-blok";
-        blok.innerHTML=
-            "<div class=\"wk-maatregel-kop\"><span>Maatregel "+(i+1)+"</span>"
-            +"<button type=\"button\" class=\"wk-verwijder-btn\" aria-label=\"Verwijder\">&#10005;</button></div>"
-            +"<label class=\"wk-label\">Omschrijving <span class=\"wk-req\">*</span></label>"
-            +"<textarea class=\"wk-input wk-measure-desc\" name=\"measures["+i+"][desc]\" rows=\"2\" placeholder=\"Beschrijf de maatregel concreet\"></textarea>"
-            +"<label class=\"wk-label\">Categorie</label>"
-            +"<select class=\"wk-select\" name=\"measures["+i+"][cat]\">"
-            +"<option value=\"\">-- kies --</option>"
-            +"<option value=\"individueel\">Individueel (eigen werkdrukbudget)</option>"
-            +"<option value=\"collectief\">Collectief (schoolbudget)</option>"
-            +"<option value=\"nvt\">n.v.t.</option>"
-            +"</select>"
-            +"<label class=\"wk-label\">Effect</label>"
-            +"<select class=\"wk-select\" name=\"measures["+i+"][effect]\">"
-            +"<option value=\"\">-- kies --</option>"
-            +"<option value=\"++\">++ Zeer groot effect</option>"
-            +"<option value=\"+\">+ Groot effect</option>"
-            +"<option value=\"-\">- Beperkt effect</option>"
-            +"<option value=\"--\">-- Zeer beperkt effect</option>"
-            +"<option value=\"nvt\">n.v.t.</option>"
-            +"</select>"
-            +"<label class=\"wk-label\">Haalbaarheid</label>"
-            +"<select class=\"wk-select\" name=\"measures["+i+"][feasibility]\">"
-            +"<option value=\"\">-- kies --</option>"
-            +"<option value=\"++\">++ Zeer goed haalbaar</option>"
-            +"<option value=\"+\">+ Goed haalbaar</option>"
-            +"<option value=\"-\">- Moeilijk haalbaar</option>"
-            +"<option value=\"--\">-- Nauwelijks haalbaar</option>"
-            +"<option value=\"nvt\">n.v.t.</option>"
-            +"</select>";
-        lijst.appendChild(blok);
-        if(desc) blok.querySelector(".wk-measure-desc").value=desc;
-        blok.querySelector(".wk-measure-desc").focus();
+    function addMaatregel(desc) {
+        const lijst = document.getElementById('wk-measures');
+        if (!lijst) return;
+        const i = lijst.querySelectorAll('.wk-mblok').length;
+        const div = document.createElement('div');
+        // Haal HTML-template op via PHP-echo in data-attribuut is niet nodig:
+        // we bouwen het blok identiek aan PHP's maatregel_blok().
+        div.innerHTML = maatregelHTML(i);
+        lijst.appendChild(div);
+        if (desc) div.querySelector('.wk-mdesc').value = desc;
+        div.querySelector('.wk-mdesc').focus();
     }
 
-    function wkHernummer(){
-        var lijst=document.getElementById("wk-measures-lijst");
-        if(!lijst) return;
-        lijst.querySelectorAll(".wk-maatregel-blok").forEach(function(blok,i){
-            var kop=blok.querySelector(".wk-maatregel-kop span");
-            if(kop) kop.textContent="Maatregel "+(i+1);
-            blok.querySelectorAll("[name]").forEach(function(el){
-                el.name=el.name.replace(/measures\[\d+\]/,"measures["+i+"]");
+    function maatregelHTML(i) {
+        const effectOpts = [['++','++ Zeer groot effect'],['+',' +  Groot effect'],['-','- Beperkt effect'],['--','-- Zeer beperkt effect'],['nvt','n.v.t.']];
+        const haalOpts   = [['++','++ Zeer goed haalbaar'],['+',' +  Goed haalbaar'],['-','- Moeilijk haalbaar'],['--','-- Nauwelijks haalbaar'],['nvt','n.v.t.']];
+        const catOpts    = [['individueel','Individueel (eigen werkdrukbudget)'],['collectief','Collectief (schoolbudget)'],['nvt','n.v.t.']];
+        const sel = (name, opts) => `<select class="wk-sel" name="${name}"><option value="">-- kies --</option>`
+            + opts.map(([v,l]) => `<option value="${v}">${l}</option>`).join('') + '</select>';
+        return `<div class="wk-mblok">
+            <div class="wk-mkop"><span>Maatregel ${i+1}</span>
+            <button type="button" class="wk-del" aria-label="Verwijder">&#10005;</button></div>
+            <label class="wk-lbl">Omschrijving <span class="wk-req">*</span></label>
+            <textarea class="wk-inp wk-mdesc" name="measures[${i}][desc]" rows="2" placeholder="Beschrijf de maatregel concreet"></textarea>
+            <label class="wk-lbl">Categorie</label>${sel(`measures[${i}][cat]`,catOpts)}
+            <label class="wk-lbl">Effect</label>${sel(`measures[${i}][effect]`,effectOpts)}
+            <label class="wk-lbl">Haalbaarheid</label>${sel(`measures[${i}][feasibility]`,haalOpts)}
+            </div>`;
+    }
+
+    function hernummer() {
+        const lijst = document.getElementById('wk-measures');
+        if (!lijst) return;
+        lijst.querySelectorAll('.wk-mblok').forEach((blok, i) => {
+            const kop = blok.querySelector('.wk-mkop span');
+            if (kop) kop.textContent = `Maatregel ${i + 1}`;
+            blok.querySelectorAll('[name]').forEach(el => {
+                el.name = el.name.replace(/measures\[\d+\]/g, `measures[${i}]`);
             });
         });
     }
-
 })();
-        </script>';
+</script>
+JS;
+        // phpcs:enable
     }
-
-} /* === EINDE CLASS Werkdruk_Form === */
-/* === EINDE BESTAND class-form.php VOLLEDIG === */
-
-
+}
