@@ -20,7 +20,7 @@ class Werkdruk_Overview {
         $team_filter = sanitize_text_field( $_GET['team'] ?? '' );
         echo '<div class="wrap"><h1>Werkdruk KoersKaart – Beheer</h1>';
         self::export_knop( $team_filter );
-        // In het dashboard: $is_backend = true
+        // Backend aanroep met true voor de actie-kolom
         self::render( $team_filter, true ); 
         echo '</div>';
     }
@@ -56,7 +56,6 @@ class Werkdruk_Overview {
         echo '<th style="width:150px;">Wie?</th>';
         echo '<th>Inhoud (Oorzaken, Oplossingen, Maatregelen)</th>';
         
-        // Alleen de kolom 'Actie' tonen als we echt in de WP-admin (dashboard) zijn
         if ( is_admin() && $is_backend ) {
             echo '<th style="width:100px;">Actie</th>';
         }
@@ -72,7 +71,6 @@ class Werkdruk_Overview {
             echo '<strong>Maatregelen:</strong> ' . esc_html( self::maatregelen_naar_tekst($row->measures) );
             echo '</td>';
             
-            // Alleen de verwijderknop tonen als we in het dashboard zijn
             if ( is_admin() && $is_backend ) {
                 $delete_url = wp_nonce_url( admin_url( 'admin-post.php?action=werkdruk_delete_entry&entry_id=' . $row->id ), 'werkdruk_delete' );
                 echo '<td><a href="' . $delete_url . '" style="color:#a00; font-weight:bold;" onclick="return confirm(\'Zeker weten?\')">Verwijderen</a></td>';
@@ -132,4 +130,24 @@ class Werkdruk_Overview {
             global $wpdb;
             $wpdb->delete( Werkdruk_KoersKaart_Plugin::tbl(), [ 'id' => $id ] );
         }
-        wp_safe_redirect( admin_url( 'admin.php?page=werkdruk-koerskaart&
+        wp_safe_redirect( admin_url( 'admin.php?page=werkdruk-koerskaart&deleted=1' ) );
+        exit;
+    }
+
+    private static function json_naar_tekst( ?string $json ): string {
+        $items = Werkdruk_KoersKaart_Plugin::decode( $json );
+        return implode( ' | ', array_map( 'strval', $items ) );
+    }
+
+    private static function maatregelen_naar_tekst( ?string $json ): string {
+        $items = Werkdruk_KoersKaart_Plugin::decode( $json );
+        $parts = [];
+        foreach ( $items as $m ) {
+            if ( is_array($m) && !empty($m['desc']) ) {
+                $meta = array_filter( [ $m['cat'] ?? '', $m['effect'] ?? '', $m['feasibility'] ?? '' ] );
+                $parts[] = $m['desc'] . ( $meta ? ' (' . implode(', ', $meta) . ')' : '' );
+            }
+        }
+        return implode( ' | ', $parts );
+    }
+}
