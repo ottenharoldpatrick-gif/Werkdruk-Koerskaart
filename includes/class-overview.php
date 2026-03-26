@@ -26,7 +26,7 @@ class Werkdruk_Overview {
 
         echo '<div class="wrap"><h1>Werkdruk KoersKaart – Beheer</h1>';
         self::export_knop( $team_filter );
-        // In de backend (dashboard) tonen we de tabel MET verwijder-optie
+        // In de backend tonen we de tabel MET verwijder-optie
         self::render( $team_filter, true ); 
         echo '</div>';
     }
@@ -73,18 +73,14 @@ class Werkdruk_Overview {
 
         foreach ( $results as $row ) {
             echo '<tr>';
-            // Datum & Team
             echo '<td>' . esc_html( date('d-m-Y', strtotime($row->created_at)) ) . '<br><small>Team: ' . esc_html($row->team) . '</small></td>';
-            // Naam & Niveau
             echo '<td><strong>' . esc_html($row->name) . '</strong><br><small>' . esc_html($row->wp_level) . '</small></td>';
-            // Inhoud
             echo '<td>';
             echo '<strong>Oorzaken:</strong> ' . esc_html( self::json_naar_tekst($row->causes) ) . '<br><br>';
             echo '<strong>Oplossingen:</strong> ' . esc_html( self::json_naar_tekst($row->solutions) ) . '<br><br>';
             echo '<strong>Maatregelen:</strong> ' . esc_html( self::maatregelen_naar_tekst($row->measures) );
             echo '</td>';
             
-            // Verwijder-knop (Alleen in de WP-admin dashboard)
             if ( $is_backend ) {
                 $delete_url = wp_nonce_url( admin_url( 'admin-post.php?action=werkdruk_delete_entry&entry_id=' . $row->id ), 'werkdruk_delete' );
                 echo '<td><a href="' . $delete_url . '" style="color:#a00; font-weight:bold;" onclick="return confirm(\'Zeker weten?\')">Verwijderen</a></td>';
@@ -95,7 +91,7 @@ class Werkdruk_Overview {
     }
 
     /* ------------------------------------------------------------------ */
-    /* Export & Verwijderen                                              */
+    /* Export naar CSV (Excel) - Nu met aparte kolommen per maatregel      */
     /* ------------------------------------------------------------------ */
 
     public static function export_csv(): void {
@@ -110,22 +106,56 @@ class Werkdruk_Overview {
             ? $wpdb->get_results( $wpdb->prepare( "SELECT * FROM `$tbl` WHERE team = %s ORDER BY created_at DESC", $team ), ARRAY_A )
             : $wpdb->get_results( "SELECT * FROM `$tbl` ORDER BY team ASC, created_at DESC", ARRAY_A );
 
+        if ( empty( $rows ) ) wp_die( 'Geen gegevens om te exporteren.' );
+
+        // 1. Bepaal het maximale aantal maatregelen voor de kolomkoppen
+        $max_measures = 0;
+        foreach ( $rows as $r ) {
+            $m = Werkdruk_KoersKaart_Plugin::decode( $r['measures'] );
+            $max_measures = max( $max_measures, count( $m ) );
+        }
+
         $filename = 'export-werkdruk-' . date('Y-m-d') . '.csv';
         header( 'Content-Type: text/csv; charset=utf-8' );
         header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
         
         $out = fopen( 'php://output', 'w' );
-        fwrite( $out, "\xEF\xBB\xBF" ); // UTF-8 BOM voor Excel
-        fputcsv( $out, [ 'Datum', 'Team', 'Naam', 'Niveau', 'Oorzaken', 'Oplossingen', 'Maatregelen' ], ';' );
+        fwrite( $out, "\xEF\xBB\xBF" ); // UTF-8 BOM voor Excel (zorgt dat vreemde tekens goed getoond worden)
 
-        foreach ( $rows as $r ) {
-            fputcsv( $out, [
-                $r['created_at'], $r['team'], $r['name'], $r['wp_level'],
-                self::json_naar_tekst( $r['causes'] ),
-                self::json_naar_tekst( $r['solutions'] ),
-                self::maatregelen_naar_tekst( $r['measures'] )
-            ], ';' );
+        // 2. Maak de kopregel
+        $header = [ 'Datum', 'Team', 'Naam', 'Niveau', 'Oorzaken', 'Oplossingen' ];
+        for ( $i = 1; $i <= $max_measures; $i++ ) {
+            $header[] = "Maatregel $i";
         }
+        fputcsv( $out, $header, ';' );
+
+        // 3. Vul de rijen
+        foreach ( $rows as $r ) {
+            $measures = Werkdruk_KoersKaart_Plugin::decode( $r['measures'] );
+            
+            $data_row = [
+                $r['created_at'], 
+                $r['team'], 
+                $r['name'], 
+                $r['wp_level'],
+                self::json_naar_tekst( $r['causes'] ),
+                self::json_naar_tekst( $r['solutions'] )
+            ];
+
+            // Voeg elke maatregel toe aan een eigen kolom
+            for ( $i = 0; $i < $max_measures; $i++ ) {
+                if ( isset( $measures[$i] ) ) {
+                    $m = $measures[$i];
+                    $meta = array_filter( [ $m['cat'] ?? '', $m['effect'] ?? '', $m['feasibility'] ?? '' ] );
+                    // We zetten de details tussen haakjes achter de omschrijving
+                    $data_row[] = $m['desc'] . ( $meta ? ' (' . implode(', ', $meta) . ')' : '' );
+                } else {
+                    $data_row[] = ''; // Lege cel als deze persoon minder maatregelen had
+                }
+            }
+            fputcsv( $out, $data_row, ';' );
+        }
+        
         fclose( $out );
         exit;
     }
