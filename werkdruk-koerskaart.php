@@ -97,10 +97,10 @@ final class Werkdruk_KoersKaart_Plugin {
         Werkdruk_Form::render( $team, $status, [] );
 
         // Alleen voor beheerders laten we de tabel onder het formulier zien
-        if ( current_user_can( 'edit_posts' ) ) {
-            echo '<hr style="margin: 50px 0;"><h3>Beheerdersoverzicht: Inzendingen voor dit team</h3>';
-            Werkdruk_Overview::render( $team_preset, false );
-        }
+       if ( current_user_can( 'edit_posts' ) ) {
+            echo '<hr style="margin: 50px 0;"><h3>Beheerdersoverzicht</h3>';
+            Werkdruk_Overview::render( $team, false ); // Let op de 'false'
+    }
 
         return ob_get_clean();
     }
