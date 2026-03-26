@@ -30,6 +30,7 @@ final class Werkdruk_KoersKaart_Plugin {
         add_action( 'init',       [ $this, 'handle_post' ] );
         add_shortcode( 'werkdruk_koerskaart', [ $this, 'shortcode' ] );
         
+        // Koppeling met de nieuwe Werkdruk_Overview class
         add_action( 'admin_menu', [ 'Werkdruk_Overview', 'register' ] );
         add_action( 'admin_post_werkdruk_export_csv',    [ 'Werkdruk_Overview', 'export_csv' ] );
         add_action( 'admin_post_werkdruk_delete_entry',  [ 'Werkdruk_Overview', 'delete_entry' ] );
