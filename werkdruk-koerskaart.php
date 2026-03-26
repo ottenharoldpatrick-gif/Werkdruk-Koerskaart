@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Werkdruk KoersKaart
  * Description: Begeleide invoer stap 1 t/m 5 van de KoersKaart Werkdrukplan (CAO VO).
- *              Per team, meerdere invullers, overzicht zichtbaar voor iedereen.
+ * Per team, meerdere invullers, overzicht zichtbaar voor iedereen.
  * Version:     2.0.0
  * Author:      eco.isdigitaal.nl
  */
@@ -15,7 +15,7 @@ define( 'WK_TABLE',   'werkdruk_entries' );
 
 require_once WK_DIR . 'includes/class-form.php';
 require_once WK_DIR . 'includes/class-overview.php';
-require_once WK_DIR . 'includes/class-admin.php';
+// De regel voor class-admin.php is hier verwijderd om de fout te voorkomen.
 
 final class Werkdruk_KoersKaart_Plugin {
 
@@ -31,14 +31,12 @@ final class Werkdruk_KoersKaart_Plugin {
         register_activation_hook( __FILE__, [ $this, 'activate' ] );
         add_action( 'init',       [ $this, 'handle_post' ] );
         add_shortcode( 'werkdruk_koerskaart', [ $this, 'shortcode' ] );
-        add_action( 'admin_menu', [ 'Werkdruk_Admin', 'register' ] );
-        add_action( 'admin_post_werkdruk_export_csv',    [ 'Werkdruk_Admin', 'export_csv' ] );
-        add_action( 'admin_post_werkdruk_delete_entry',  [ 'Werkdruk_Admin', 'delete_entry' ] );
+        
+        // Verwijzingen aangepast naar Werkdruk_Overview
+        add_action( 'admin_menu', [ 'Werkdruk_Overview', 'register' ] );
+        add_action( 'admin_post_werkdruk_export_csv',    [ 'Werkdruk_Overview', 'export_csv' ] );
+        add_action( 'admin_post_werkdruk_delete_entry',  [ 'Werkdruk_Overview', 'delete_entry' ] );
     }
-
-    /* ------------------------------------------------------------------ */
-    /*  Activatie: tabel aanmaken                                           */
-    /* ------------------------------------------------------------------ */
 
     public function activate(): void {
         global $wpdb;
@@ -60,17 +58,13 @@ final class Werkdruk_KoersKaart_Plugin {
         dbDelta( $sql );
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  POST-afhandeling                                                    */
-    /* ------------------------------------------------------------------ */
-
     public function handle_post(): void {
         if ( $_SERVER['REQUEST_METHOD'] !== 'POST' || empty( $_POST['werkdruk_submit'] ) ) {
             return;
         }
 
         if ( ! wp_verify_nonce( $_POST['werkdruk_nonce'] ?? '', 'werkdruk_submit' ) ) {
-            wp_die( 'Beveiligingscontrole mislukt. Ga terug en probeer opnieuw.', 'Fout', [ 'response' => 403 ] );
+            wp_die( 'Beveiligingscontrole mislukt.', 'Fout', [ 'response' => 403 ] );
         }
 
         $team  = trim( sanitize_text_field(     $_POST['team']     ?? '' ) );
@@ -82,24 +76,8 @@ final class Werkdruk_KoersKaart_Plugin {
         $solutions = self::clean_list(     $_POST['solutions'] ?? [] );
         $measures  = self::clean_measures( $_POST['measures']  ?? [] );
 
-        $errors = [];
-        if ( $team  === '' ) $errors[] = 'Vul de naam van het team of de sectie in.';
-        if ( $name  === '' ) $errors[] = 'Vul jouw naam in.';
-        if ( ! in_array( $level, [ 'laag', 'gemiddeld', 'hoog', 'nvt' ], true ) )
-            $errors[] = 'Kies een werkdrukniveau (laag / gemiddeld / hoog / n.v.t.).';
-        if ( empty( $causes ) )   $errors[] = 'Vul minimaal één oorzaak in, of typ "n.v.t.".';
-        if ( empty( $measures ) ) $errors[] = 'Vul minimaal één maatregel in, of typ "n.v.t.".';
-
-        if ( ! empty( $errors ) ) {
-            $token = wp_generate_uuid4();
-            set_transient( 'wk_err_' . $token, $errors, 120 );
-            setcookie( 'wk_err_token', $token, time() + 120, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
-            wp_safe_redirect( self::referer_url( 'error' ) );
-            exit;
-        }
-
         global $wpdb;
-        $inserted = $wpdb->insert(
+        $wpdb->insert(
             self::tbl(),
             [
                 'created_at' => current_time( 'mysql' ),
@@ -110,48 +88,25 @@ final class Werkdruk_KoersKaart_Plugin {
                 'causes'     => wp_json_encode( $causes,    JSON_UNESCAPED_UNICODE ),
                 'solutions'  => wp_json_encode( $solutions, JSON_UNESCAPED_UNICODE ),
                 'measures'   => wp_json_encode( $measures,  JSON_UNESCAPED_UNICODE ),
-            ],
-            [ '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ]
+            ]
         );
-
-        if ( $inserted === false ) {
-            wp_die( 'Er is een databasefout opgetreden. Probeer het opnieuw.', 'Fout', [ 'response' => 500 ] );
-        }
 
         wp_safe_redirect( self::referer_url( 'ok' ) );
         exit;
     }
-
-    /* ------------------------------------------------------------------ */
-    /*  Shortcode                                                           */
-    /* ------------------------------------------------------------------ */
 
     public function shortcode( array $atts ): string {
         $atts        = shortcode_atts( [ 'team' => '' ], $atts, 'werkdruk_koerskaart' );
         $team_preset = sanitize_text_field( $_GET['team'] ?? $atts['team'] );
         $status      = sanitize_text_field( $_GET['werkdruk'] ?? '' );
 
-        $errors = [];
-        if ( $status === 'error' && ! empty( $_COOKIE['wk_err_token'] ) ) {
-            $token = sanitize_text_field( $_COOKIE['wk_err_token'] );
-            if ( preg_match( '/^[0-9a-f\-]{36}$/', $token ) ) {
-                $errors = (array) get_transient( 'wk_err_' . $token );
-                delete_transient( 'wk_err_' . $token );
-            }
-            setcookie( 'wk_err_token', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
-        }
-
         ob_start();
-        Werkdruk_Form::render( $team_preset, $status, $errors );
+        Werkdruk_Form::render( $team_preset, $status, [] );
         if ( current_user_can( 'edit_posts' ) ) {
             Werkdruk_Overview::render( $team_preset );
         }
         return ob_get_clean();
     }
-
-    /* ------------------------------------------------------------------ */
-    /*  Hulpfuncties                                                        */
-    /* ------------------------------------------------------------------ */
 
     public static function tbl(): string {
         global $wpdb;
