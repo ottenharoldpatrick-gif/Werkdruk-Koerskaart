@@ -3,6 +3,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class Werkdruk_Overview {
 
+    /* ------------------------------------------------------------------ */
+    /* Menu Registratie                                                  */
+    /* ------------------------------------------------------------------ */
+
     public static function register(): void {
         add_menu_page(
             'Werkdruk KoersKaart',
@@ -22,7 +26,7 @@ class Werkdruk_Overview {
 
         echo '<div class="wrap"><h1>Werkdruk KoersKaart – Beheer</h1>';
         self::export_knop( $team_filter );
-        // In het beheer laten we ALLES zien
+        // In de backend (dashboard) tonen we de tabel MET verwijder-optie
         self::render( $team_filter, true ); 
         echo '</div>';
     }
@@ -35,6 +39,10 @@ class Werkdruk_Overview {
         ], admin_url( 'admin-post.php' ) );
         echo '<p><a href="' . esc_url( $url ) . '" class="button button-primary">↓ Exporteer naar Excel (CSV)</a></p>';
     }
+
+    /* ------------------------------------------------------------------ */
+    /* De Tabel (Zowel voor site als dashboard)                          */
+    /* ------------------------------------------------------------------ */
 
     public static function render( string $team_filter = '', bool $is_backend = false ): void {
         global $wpdb;
@@ -49,40 +57,46 @@ class Werkdruk_Overview {
         $results = $wpdb->get_results( $query );
 
         if ( empty( $results ) ) {
-            echo '<p>Nog geen invoer gevonden.</p>';
+            echo '<p>Nog geen inzendingen gevonden.</p>';
             return;
         }
 
-        echo '<table class="wp-list-table widefat fixed striped" style="margin-top:20px;">';
+        echo '<table class="wp-list-table widefat fixed striped" style="margin-top:20px; border: 1px solid #ccc;">';
         echo '<thead><tr>';
-        echo '<th style="width:15%">Datum & Team</th>';
-        echo '<th style="width:15%">Naam & Niveau</th>';
-        echo '<th>Inhoud (Oorzaken & Oplossingen)</th>';
-        if ( $is_backend ) echo '<th style="width:100px;">Actie</th>';
+        echo '<th style="width:120px;">Datum</th>';
+        echo '<th style="width:150px;">Wie?</th>';
+        echo '<th>Inhoud (Oorzaken, Oplossingen, Maatregelen)</th>';
+        if ( $is_backend ) {
+            echo '<th style="width:100px;">Actie</th>';
+        }
         echo '</tr></thead><tbody>';
 
         foreach ( $results as $row ) {
             echo '<tr>';
-            // Kolom 1: Info
-            echo '<td><strong>' . esc_html( date('d-m-Y', strtotime($row->created_at)) ) . '</strong><br><small>' . esc_html($row->team) . '</small></td>';
-            // Kolom 2: Persoon
-            echo '<td><strong>' . esc_html($row->name) . '</strong><br>' . esc_html($row->wp_level) . '</td>';
-            // Kolom 3: De inhoud (Overzichtelijk onder elkaar)
+            // Datum & Team
+            echo '<td>' . esc_html( date('d-m-Y', strtotime($row->created_at)) ) . '<br><small>Team: ' . esc_html($row->team) . '</small></td>';
+            // Naam & Niveau
+            echo '<td><strong>' . esc_html($row->name) . '</strong><br><small>' . esc_html($row->wp_level) . '</small></td>';
+            // Inhoud
             echo '<td>';
-            echo '<strong>Oorzaken:</strong> ' . esc_html( self::json_naar_tekst($row->causes) ) . '<br>';
-            echo '<strong>Oplossingen:</strong> ' . esc_html( self::json_naar_tekst($row->solutions) ) . '<br>';
+            echo '<strong>Oorzaken:</strong> ' . esc_html( self::json_naar_tekst($row->causes) ) . '<br><br>';
+            echo '<strong>Oplossingen:</strong> ' . esc_html( self::json_naar_tekst($row->solutions) ) . '<br><br>';
             echo '<strong>Maatregelen:</strong> ' . esc_html( self::maatregelen_naar_tekst($row->measures) );
             echo '</td>';
             
-            // Kolom 4: Alleen verwijderknop in de backend
+            // Verwijder-knop (Alleen in de WP-admin dashboard)
             if ( $is_backend ) {
                 $delete_url = wp_nonce_url( admin_url( 'admin-post.php?action=werkdruk_delete_entry&entry_id=' . $row->id ), 'werkdruk_delete' );
-                echo '<td><a href="' . $delete_url . '" style="color:#a00;" onclick="return confirm(\'Weet je zeker dat je deze inzending wilt verwijderen?\')">Verwijderen</a></td>';
+                echo '<td><a href="' . $delete_url . '" style="color:#a00; font-weight:bold;" onclick="return confirm(\'Zeker weten?\')">Verwijderen</a></td>';
             }
             echo '</tr>';
         }
         echo '</tbody></table>';
     }
+
+    /* ------------------------------------------------------------------ */
+    /* Export & Verwijderen                                              */
+    /* ------------------------------------------------------------------ */
 
     public static function export_csv(): void {
         if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Geen toegang.' );
@@ -129,17 +143,24 @@ class Werkdruk_Overview {
         exit;
     }
 
+    /* ------------------------------------------------------------------ */
+    /* Hulpfuncties                                                      */
+    /* ------------------------------------------------------------------ */
+
     private static function json_naar_tekst( ?string $json ): string {
         $items = Werkdruk_KoersKaart_Plugin::decode( $json );
-        return implode( ', ', array_map( 'strval', $items ) );
+        return implode( ' | ', array_map( 'strval', $items ) );
     }
 
     private static function maatregelen_naar_tekst( ?string $json ): string {
         $items = Werkdruk_KoersKaart_Plugin::decode( $json );
         $parts = [];
         foreach ( $items as $m ) {
-            if ( is_array($m) ) $parts[] = $m['desc'] ?? '';
+            if ( is_array($m) && !empty($m['desc']) ) {
+                $meta = array_filter( [ $m['cat'] ?? '', $m['effect'] ?? '', $m['feasibility'] ?? '' ] );
+                $parts[] = $m['desc'] . ( $meta ? ' (' . implode(', ', $meta) . ')' : '' );
+            }
         }
-        return implode( ', ', $parts );
+        return implode( ' | ', $parts );
     }
 }
