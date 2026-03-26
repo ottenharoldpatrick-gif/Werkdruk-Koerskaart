@@ -55,10 +55,7 @@ final class Werkdruk_KoersKaart_Plugin {
 
     public function handle_post(): void {
         if ( $_SERVER['REQUEST_METHOD'] !== 'POST' || empty( $_POST['werkdruk_submit'] ) ) return;
-
-        if ( ! wp_verify_nonce( $_POST['werkdruk_nonce'] ?? '', 'werkdruk_submit' ) ) {
-            wp_die( 'Beveiliging verlopen, probeer het opnieuw.' );
-        }
+        if ( ! wp_verify_nonce( $_POST['werkdruk_nonce'] ?? '', 'werkdruk_submit' ) ) wp_die( 'Beveiliging verlopen.' );
 
         global $wpdb;
         $wpdb->insert( self::tbl(), [
@@ -80,23 +77,21 @@ final class Werkdruk_KoersKaart_Plugin {
         $atts   = shortcode_atts( [ 'team' => '' ], $atts, 'werkdruk_koerskaart' );
         $status = sanitize_text_field( $_GET['werkdruk'] ?? '' );
         $team   = sanitize_text_field( $_GET['team'] ?? $atts['team'] );
-
         ob_start();
         
         if ( $status === 'ok' ) {
-            echo '<div id="wk-success" style="background-color: #d4edda; color: #155724; padding: 20px; border: 1px solid #c3e6cb; margin-bottom: 30px; border-radius: 4px;">';
-            echo '<strong>Gelukt!</strong> Je formulier is verzonden en de resultaten hieronder zijn bijgewerkt.';
+            echo '<div style="background-color: #d4edda; color: #155724; padding: 20px; border: 1px solid #c3e6cb; margin-bottom: 30px; border-radius: 4px;">';
+            echo '<strong>Gelukt!</strong> Je bijdrage is succesvol verzonden.';
             echo '</div>';
         }
 
         Werkdruk_Form::render( $team, $status, [] );
 
         if ( current_user_can( 'edit_posts' ) ) {
-            echo '<hr style="margin: 50px 0;"><h3>Huidige inzendingen (Beheerdersoverzicht)</h3>';
-            // De 'false' zorgt ervoor dat er geen verwijderknoppen op de site staan
+            echo '<hr style="margin: 50px 0;"><h3>Huidige inzendingen</h3>';
+            // De 'false' zorgt ervoor dat de Actie-kolom niet verschijnt op de site
             Werkdruk_Overview::render( $team, false ); 
         }
-
         return ob_get_clean();
     }
 
@@ -134,5 +129,4 @@ final class Werkdruk_KoersKaart_Plugin {
         return is_array( $decoded ) ? $decoded : [];
     }
 }
-
 Werkdruk_KoersKaart_Plugin::init();
