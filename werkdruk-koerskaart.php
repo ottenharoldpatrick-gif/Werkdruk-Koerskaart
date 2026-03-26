@@ -88,11 +88,16 @@ final class Werkdruk_KoersKaart_Plugin {
 
         Werkdruk_Form::render( $team, $status, [] );
 
-        if ( current_user_can( 'edit_posts' ) ) {
+        // NIEUW: Check op rol 'Docent' OF bewerkingsrechten (Editor/Admin)
+        $user = wp_get_current_user();
+        $is_docent = in_array( 'Docent', (array) $user->roles );
+
+        if ( current_user_can( 'edit_posts' ) || $is_docent ) {
             echo '<hr style="margin: 50px 0;"><h3>Huidige inzendingen</h3>';
-            // De 'false' zorgt ervoor dat de Actie-kolom niet verschijnt op de site
+            // De 'false' zorgt ervoor dat de Actie-kolom (verwijderen) niet verschijnt op de site
             Werkdruk_Overview::render( $team, false ); 
         }
+        
         return ob_get_clean();
     }
 
