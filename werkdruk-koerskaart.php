@@ -12,7 +12,6 @@ define( 'WK_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'WK_VERSION', '2.0.0' );
 define( 'WK_TABLE',   'werkdruk_entries' );
 
-// We laden alleen de nodige bestanden
 require_once WK_DIR . 'includes/class-form.php';
 require_once WK_DIR . 'includes/class-overview.php';
 
@@ -31,7 +30,6 @@ final class Werkdruk_KoersKaart_Plugin {
         add_action( 'init',       [ $this, 'handle_post' ] );
         add_shortcode( 'werkdruk_koerskaart', [ $this, 'shortcode' ] );
         
-        // Koppeling met de administratie (back-end)
         add_action( 'admin_menu', [ 'Werkdruk_Overview', 'register' ] );
         add_action( 'admin_post_werkdruk_export_csv',    [ 'Werkdruk_Overview', 'export_csv' ] );
         add_action( 'admin_post_werkdruk_delete_entry',  [ 'Werkdruk_Overview', 'delete_entry' ] );
@@ -55,7 +53,6 @@ final class Werkdruk_KoersKaart_Plugin {
         dbDelta( $sql );
     }
 
-    // Deze functie verwerkt de verzending
     public function handle_post(): void {
         if ( $_SERVER['REQUEST_METHOD'] !== 'POST' || empty( $_POST['werkdruk_submit'] ) ) return;
 
@@ -75,7 +72,6 @@ final class Werkdruk_KoersKaart_Plugin {
             'measures'   => wp_json_encode( self::clean_measures( $_POST['measures'] ?? [] ) ),
         ]);
 
-        // Hier sturen we de gebruiker terug naar de pagina waar hij vandaan kwam
         wp_safe_redirect( self::referer_url( 'ok' ) );
         exit;
     }
@@ -87,20 +83,19 @@ final class Werkdruk_KoersKaart_Plugin {
 
         ob_start();
         
-        // TOON BEDANKT BERICHT
         if ( $status === 'ok' ) {
-            echo '<div id="wk-success" style="background-color: #e6fffa; color: #234e52; padding: 20px; border-left: 5px solid #38b2ac; margin-bottom: 30px; border-radius: 4px;">';
-            echo '<strong>Gelukt!</strong> Je formulier is verzonden en de resultaten zijn bijgewerkt.';
+            echo '<div id="wk-success" style="background-color: #d4edda; color: #155724; padding: 20px; border: 1px solid #c3e6cb; margin-bottom: 30px; border-radius: 4px;">';
+            echo '<strong>Gelukt!</strong> Je formulier is verzonden en de resultaten hieronder zijn bijgewerkt.';
             echo '</div>';
         }
 
         Werkdruk_Form::render( $team, $status, [] );
 
-        // Alleen voor beheerders laten we de tabel onder het formulier zien
-       if ( current_user_can( 'edit_posts' ) ) {
-            echo '<hr style="margin: 50px 0;"><h3>Beheerdersoverzicht</h3>';
-            Werkdruk_Overview::render( $team, false ); // Let op de 'false'
-    }
+        if ( current_user_can( 'edit_posts' ) ) {
+            echo '<hr style="margin: 50px 0;"><h3>Huidige inzendingen (Beheerdersoverzicht)</h3>';
+            // De 'false' zorgt ervoor dat er geen verwijderknoppen op de site staan
+            Werkdruk_Overview::render( $team, false ); 
+        }
 
         return ob_get_clean();
     }
@@ -110,7 +105,6 @@ final class Werkdruk_KoersKaart_Plugin {
         return $wpdb->prefix . WK_TABLE;
     }
 
-    // Hulpfunctie voor het bepalen van de terugstuur-URL
     private static function referer_url( string $status ): string {
         $ref = $_SERVER['HTTP_REFERER'] ?? home_url( '/' );
         $ref = remove_query_arg( 'werkdruk', $ref );
