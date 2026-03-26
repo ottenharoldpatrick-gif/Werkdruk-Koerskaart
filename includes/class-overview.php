@@ -3,10 +3,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class Werkdruk_Overview {
 
-    /* ------------------------------------------------------------------ */
-    /* Menu Registratie (vervangt class-admin.php)                         */
-    /* ------------------------------------------------------------------ */
-
     public static function register(): void {
         add_menu_page(
             'Werkdruk KoersKaart',
@@ -19,19 +15,15 @@ class Werkdruk_Overview {
         );
     }
 
-    /* ------------------------------------------------------------------ */
-    /* Admin-overzichtspagina                                              */
-    /* ------------------------------------------------------------------ */
-
     public static function render_pagina(): void {
         if ( ! current_user_can( 'manage_options' ) ) return;
 
         $team_filter = sanitize_text_field( $_GET['team'] ?? '' );
 
-        echo '<div class="wrap">';
-        echo '<h1>Werkdruk KoersKaart – Beheer</h1>';
+        echo '<div class="wrap"><h1>Werkdruk KoersKaart – Beheer</h1>';
         self::export_knop( $team_filter );
-        self::render( $team_filter ); // Aanroep naar de eigen render functie
+        // In het beheer laten we ALLES zien
+        self::render( $team_filter, true ); 
         echo '</div>';
     }
 
@@ -41,15 +33,10 @@ class Werkdruk_Overview {
             'team'   => rawurlencode( $team ),
             '_wpnonce' => wp_create_nonce( 'werkdruk_export' ),
         ], admin_url( 'admin-post.php' ) );
-
-        echo '<p><a href="' . esc_url( $url ) . '" class="button button-primary">↓ Exporteer CSV</a></p>';
+        echo '<p><a href="' . esc_url( $url ) . '" class="button button-primary">↓ Exporteer naar Excel (CSV)</a></p>';
     }
 
-    /* ------------------------------------------------------------------ */
-    /* Render Overzicht (Tabel weergave)                                   */
-    /* ------------------------------------------------------------------ */
-
-    public static function render( string $team_filter = '' ): void {
+    public static function render( string $team_filter = '', bool $is_backend = false ): void {
         global $wpdb;
         $tbl = Werkdruk_KoersKaart_Plugin::tbl();
         
@@ -62,32 +49,43 @@ class Werkdruk_Overview {
         $results = $wpdb->get_results( $query );
 
         if ( empty( $results ) ) {
-            echo '<p>Geen resultaten gevonden.</p>';
+            echo '<p>Nog geen invoer gevonden.</p>';
             return;
         }
 
-        echo '<table class="wp-list-table widefat fixed striped">';
-        echo '<thead><tr><th>Datum</th><th>Team</th><th>Naam</th><th>Niveau</th><th>Acties</th></tr></thead>';
-        echo '<tbody>';
+        echo '<table class="wp-list-table widefat fixed striped" style="margin-top:20px;">';
+        echo '<thead><tr>';
+        echo '<th style="width:15%">Datum & Team</th>';
+        echo '<th style="width:15%">Naam & Niveau</th>';
+        echo '<th>Inhoud (Oorzaken & Oplossingen)</th>';
+        if ( $is_backend ) echo '<th style="width:100px;">Actie</th>';
+        echo '</tr></thead><tbody>';
+
         foreach ( $results as $row ) {
-            $delete_url = wp_nonce_url( admin_url( 'admin-post.php?action=werkdruk_delete_entry&entry_id=' . $row->id ), 'werkdruk_delete' );
             echo '<tr>';
-            echo '<td>' . esc_html( $row->created_at ) . '</td>';
-            echo '<td>' . esc_html( $row->team ) . '</td>';
-            echo '<td>' . esc_html( $row->name ) . '</td>';
-            echo '<td>' . esc_html( $row->wp_level ) . '</td>';
-            echo '<td><a href="' . $delete_url . '" class="submitdelete" onclick="return confirm(\'Zeker weten?\')">Verwijderen</a></td>';
+            // Kolom 1: Info
+            echo '<td><strong>' . esc_html( date('d-m-Y', strtotime($row->created_at)) ) . '</strong><br><small>' . esc_html($row->team) . '</small></td>';
+            // Kolom 2: Persoon
+            echo '<td><strong>' . esc_html($row->name) . '</strong><br>' . esc_html($row->wp_level) . '</td>';
+            // Kolom 3: De inhoud (Overzichtelijk onder elkaar)
+            echo '<td>';
+            echo '<strong>Oorzaken:</strong> ' . esc_html( self::json_naar_tekst($row->causes) ) . '<br>';
+            echo '<strong>Oplossingen:</strong> ' . esc_html( self::json_naar_tekst($row->solutions) ) . '<br>';
+            echo '<strong>Maatregelen:</strong> ' . esc_html( self::maatregelen_naar_tekst($row->measures) );
+            echo '</td>';
+            
+            // Kolom 4: Alleen verwijderknop in de backend
+            if ( $is_backend ) {
+                $delete_url = wp_nonce_url( admin_url( 'admin-post.php?action=werkdruk_delete_entry&entry_id=' . $row->id ), 'werkdruk_delete' );
+                echo '<td><a href="' . $delete_url . '" style="color:#a00;" onclick="return confirm(\'Weet je zeker dat je deze inzending wilt verwijderen?\')">Verwijderen</a></td>';
+            }
             echo '</tr>';
         }
         echo '</tbody></table>';
     }
 
-    /* ------------------------------------------------------------------ */
-    /* CSV-export Logica                                                   */
-    /* ------------------------------------------------------------------ */
-
     public static function export_csv(): void {
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Geen toegang.', 403 );
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Geen toegang.' );
         check_admin_referer( 'werkdruk_export' );
 
         global $wpdb;
@@ -98,27 +96,20 @@ class Werkdruk_Overview {
             ? $wpdb->get_results( $wpdb->prepare( "SELECT * FROM `$tbl` WHERE team = %s ORDER BY created_at DESC", $team ), ARRAY_A )
             : $wpdb->get_results( "SELECT * FROM `$tbl` ORDER BY team ASC, created_at DESC", ARRAY_A );
 
-        $filename = 'werkdruk-koerskaart-' . date( 'Y-m-d' ) . ( $team ? '-' . sanitize_title( $team ) : '' ) . '.csv';
-
+        $filename = 'export-werkdruk-' . date('Y-m-d') . '.csv';
         header( 'Content-Type: text/csv; charset=utf-8' );
         header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
-        header( 'Pragma: no-cache' );
-
+        
         $out = fopen( 'php://output', 'w' );
-        fwrite( $out, "\xEF\xBB\xBF" );
-        fputcsv( $out, [ 'ID', 'Datum', 'Team', 'Naam', 'Niveau', 'Toelichting', 'Oorzaken', 'Oplossingen', 'Maatregelen' ], ';' );
+        fwrite( $out, "\xEF\xBB\xBF" ); // UTF-8 BOM voor Excel
+        fputcsv( $out, [ 'Datum', 'Team', 'Naam', 'Niveau', 'Oorzaken', 'Oplossingen', 'Maatregelen' ], ';' );
 
         foreach ( $rows as $r ) {
             fputcsv( $out, [
-                $r['id'],
-                $r['created_at'],
-                $r['team'],
-                $r['name'],
-                $r['wp_level'],
-                $r['wp_note'],
+                $r['created_at'], $r['team'], $r['name'], $r['wp_level'],
                 self::json_naar_tekst( $r['causes'] ),
                 self::json_naar_tekst( $r['solutions'] ),
-                self::maatregelen_naar_tekst( $r['measures'] ),
+                self::maatregelen_naar_tekst( $r['measures'] )
             ], ';' );
         }
         fclose( $out );
@@ -126,34 +117,29 @@ class Werkdruk_Overview {
     }
 
     public static function delete_entry(): void {
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Geen toegang.', 403 );
-        
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Geen toegang.' );
         $id = absint( $_REQUEST['entry_id'] ?? 0 );
         check_admin_referer( 'werkdruk_delete' );
 
         if ( $id > 0 ) {
             global $wpdb;
-            $wpdb->delete( Werkdruk_KoersKaart_Plugin::tbl(), [ 'id' => $id ], [ '%d' ] );
+            $wpdb->delete( Werkdruk_KoersKaart_Plugin::tbl(), [ 'id' => $id ] );
         }
-
-        wp_safe_redirect( add_query_arg( 'deleted', '1', admin_url( 'admin.php?page=werkdruk-koerskaart' ) ) );
+        wp_safe_redirect( admin_url( 'admin.php?page=werkdruk-koerskaart&deleted=1' ) );
         exit;
     }
 
     private static function json_naar_tekst( ?string $json ): string {
         $items = Werkdruk_KoersKaart_Plugin::decode( $json );
-        return implode( ' | ', array_map( 'strval', $items ) );
+        return implode( ', ', array_map( 'strval', $items ) );
     }
 
     private static function maatregelen_naar_tekst( ?string $json ): string {
         $items = Werkdruk_KoersKaart_Plugin::decode( $json );
         $parts = [];
         foreach ( $items as $m ) {
-            if ( ! is_array( $m ) ) continue;
-            $desc = $m['desc'] ?? '';
-            $meta = array_filter( [ $m['cat'] ?? '', $m['effect'] ?? '', $m['feasibility'] ?? '' ] );
-            $parts[] = $meta ? $desc . ' (' . implode( ', ', $meta ) . ')' : $desc;
+            if ( is_array($m) ) $parts[] = $m['desc'] ?? '';
         }
-        return implode( ' | ', $parts );
+        return implode( ', ', $parts );
     }
 }
